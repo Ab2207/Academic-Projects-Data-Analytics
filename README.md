@@ -1,2 +1,2 @@
 # Academic-Projects-Data-Analytics
-Masters in Data Analytics academic projects repo 
+This folder contains all the academic projects undertaken during Masters in Data Analytics.
