@@ -1,0 +1,76 @@
+library(fpp2)
+library(tseries)
+library(forecast)
+
+setwd("\\Users\\AB\\OneDrive\\Documents\\Datasets\\Stats Data")
+
+beer = read.csv("Beer_Export_Trial.csv", header = TRUE)
+
+fit = ts(beer, start = 1961, frequency = 1)
+#As per the graph it is a trend pattern with increase in exports over the years
+#There was a constant increase in the beer export from Ireland from 1990 to 2002 and observed a steep decrease in 2003. Export was the highest in 2002
+autoplot((log(beer.fit))) +
+ggtitle("Beer Export in Ireland from 1961 to 2013") +
+ylab("Beer (In Tonnes)")
+
+#Making the series stationary. Mean looks constant.  
+beers = diff(diff(log(beer.fit)))
+autoplot(beers)
+ndiffs(beer.fit)
+
+#q = 1, P = 0, D = 2. 
+acf(beers) 
+pacf(beers)
+#AIC = -111.89 & RMSE = 0.073. ARIMA model 1 predcited the pdq values of 0,2,1 with a calculated accuracy of 90.39%. 
+#pdq values or 1,2,1 predcits the outcome at an accuracy of 92.56%
+#pdq values of 0,2,0 has the best AIC with -84.71. However, predcition accuracy is 88%
+#pdq values of 1,1,1, has an AIC of -115.29 with a prediction accuracy of 90.24% 
+model1 = arima(log(beer.fit), order=c(1,1,1))
+summary(model1)
+accuracy(model1)
+#pred = predict(model1, n.ahead = 1)
+#pred1 = 2.718^pred$pred
+data = head(pred1,1)
+og =  tail(beer)
+mdata = ts(beer, start = 1961, end = 2012, frequency = 1)
+model1.1 = arima(log(mdata), order = c(1,1,1))
+#pre = predict(model1.1, n.ahead = 1)
+#pred1.1 = 2.718^pre$pre
+data1 = head(pred1.1,1)
+
+Box.test(beer.fit, type = "Ljung-Box")
+
+
+#AIC = -114.36 & RMSE = 0.078. Need to apply and check the above with this model as the AIC is better
+ndiffs(logFit)
+d2Fit = (diff(diff((logFit))))
+adf.test(logFit)
+
+auto.arima(fit)
+logFit = log(fit)
+model2 = arima(logFit, order=c(0,2,0))
+summary(model2)
+plot(model2)
+Box.test(logFit, type = "Ljung-Box")
+hist(model2$residuals, main="Histogram of Residuals in Model2")
+pre  = predict(model2, n.ahead = 2)
+exPred = 2.718^pre$pre
+#Holt Linear Trend Method
+
+beerHolt = holt(fit, h=2)
+beerHolt
+ets(fit, model="ZZZ")
+round(accuracy(beerHolt),2)
+beerHolt$model
+
+#As a consequence of smoothing the time series with ma() some points will miss in the start and end of time series. 
+#(k-1)/2 number of observations are lost at the start and end of the series. Here, K = no. of observations that are averaged using ma(). We need to find an ideal K value in order to avoid under or over smoothing of data. 
+autoplot(ma(beer.fit,5))
+
+beer.fit1 = ses(beer.fit, h=4)
+beer.fit1
+accuracy(beer.fit1)
+autoplot(beer.fit1)
+
+ets(beer.fit)
+

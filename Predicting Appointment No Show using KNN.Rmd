@@ -1,0 +1,42 @@
+#KNN Classification using Appointment data 
+setwd("\\Users\\AB\\OneDrive\\Documents\\Datasets\\Appointment No-Show Data")
+#Library for KNN
+library(class)
+#Library used for cross validation where result is produced in the format of Confusion Matrix
+library(gmodels)
+
+data = read.csv("No_Show.csv", header = TRUE)
+str(data)
+
+#Checking for any incorrect numbers. Found Age to be -1 in one of the observations. Since age cannot be in negative, replacing it with 1 considering it a typing error.
+data.frame(table(factor(data$Age)))
+data[which(data$Age==-1),"Age"] <- 1
+
+data = data[,c(3, 6, 8:14)]
+str(data)
+levels(data$No.show) = 0:1
+levels(data$Gender) = 0:1
+summary(data)
+
+str(data)
+table(data$No.show)
+#Normalizing "Age" variable as it is the only continous variables 
+data_norm = function(x) {((x-min(x))/(max(x)-min(x)))}
+data[2] = as.data.frame(lapply(data[2], data_norm))
+
+sapply(data, function(x) sum(is.infinite(x)))
+
+#Splitting the data into 70% - 30% ratio.
+data_train = data[1:77368,1:8 ]
+data_test = data[77369:110527, 1:8]
+data_train_labels = data[1:77368, 9]
+data_test_labels = data[77369:110527, 9]
+
+
+sapply(data_train_labels, function(x) sum(is.na(x)))
+
+#Applying KNN model to the test data. After multiple attempts of setting a K value, I found that the accuracy is 80.93% and False Negative errors are less when compared to other K values. 
+data_pred = knn(data_train, data_test, data_train_labels, k=15)
+t = table(data_test_labels, data_pred)
+sum(diag(t))/sum(t)
+

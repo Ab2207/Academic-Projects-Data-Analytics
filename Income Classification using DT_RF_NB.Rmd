@@ -1,0 +1,108 @@
+setwd("\\Users\\AB\\OneDrive\\Documents\\Datasets\\Income Classification")
+
+income_data = read.csv("income_evaluation.csv", header = TRUE, na.strings=c(""))
+str(income_data)
+#Removed the column "fnlwgt" as this is the number of people the census believes the entry represents. Hence, it is not critical to our prediction of income classification 
+income_data = income_data[,-3]
+
+#There are no NA or null values as per the code. 
+sapply(income_data, function(x) sum(is.na(x)))
+
+#Checking the statistics
+table(income_data$income)
+
+#Splitting the data into Train and Test 
+library(caTools)
+set.seed(1234)
+split = sample.split(income_data, SplitRatio = 0.7)
+income_train = subset(income_data, split=="TRUE")
+income_test = subset(income_data, split=="FALSE")
+
+#Using Decision Tree 
+library(party)
+
+#After multiple attempts to Prune the tree, I have set the minsplit attribute to 7000 for readaibility of tree and to avoid the problem of over-fitting 
+decision_tree = ctree(income~., data = income_train, controls=ctree_control(mincriterion=0.99, minsplit=7000))
+print(decision_tree)
+plot(decision_tree, type='simple')
+
+#Predicting using Training model. Misclassification error for training data is 16.55% 
+train_predict = predict(decision_tree, income_train)
+train_pred_table = table(train_predict, income_train$income)
+1-sum(diag(train_pred_table))/sum(train_pred_table)
+
+#Predicting using Test model. Misclassification error for testing data is 18.04%
+test_predict = predict(decision_tree, income_test)
+test_pred_table = table(test_predict, income_test$income)
+1-sum(diag(test_pred_table))/sum(test_pred_table)
+
+#Using Random Forest 
+library(randomForest)
+#General model with Random Forest. Default values of ntrees and mtry considered as 500 and 3 respectively. Generated OOB error rate of 13.43% (86.67% accuracy) which is better compared to Decision Tree model 
+random_forest = randomForest(income~., data=income_train)
+print(random_forest)
+
+#Using Caret & e1071 packages to get the confusion matrix
+library(caret)
+library(e1071)
+rf_train_pred = predict(random_forest, income_train)
+#Train dataset with this model predicts with an accuracy of 93.8%
+rf_confMat = confusionMatrix(rf_train_pred, income_train$income)
+print(rf_confMat)
+
+#Accuracy for test data is 85.52% with precision 92.67% and recall 62.82%.  kappa = 0.5834
+rf_test_pred = predict(random_forest, income_test)
+rf_confMat_test = confusionMatrix(rf_test_pred, income_test$income)
+print(rf_confMat_test)
+
+#Plot to check the ideal number of trees. As per the graph between OOB error and trees, after 100 trees there is no significant change in the error. Hence, we will check the performance with 100 trees
+plot(random_forest)
+
+#Tuning the random forest model to check the mTry attribute. As per the plotted graph, the OOB error is lowest when mTry is 3. Hence, we will consider the mTry default value 3 
+tune = tuneRF(income_train[,-14], income_train[,14],
+              stepFactor = 0.5, 
+              plot = TRUE, 
+              ntreeTry = 100,
+              improve = 0.05)
+
+#ntrees from 100 - 150 produce OOB error rate more than the inital model "random_forest". Hence we will not consider this. Train data prediction accuracy is 93.79% while test accuracy is 85.92% with precision 92.82% and recall 62.96%. kappa = 0.5814
+rf_model2 = randomForest(income~. , data = income_train, ntree = 150, mtry = 3)
+print(rf_model2)
+train_pred_model2 = predict(rf_model2, income_train)
+cm2 = confusionMatrix(train_pred_model2, income_train$income)
+print(cm2)
+test_pred_model2 = predict(rf_model2, income_test)
+cm2_test = confusionMatrix(test_pred_model2, income_test$income)
+print(cm2_test)
+
+#Model 3 with ntree 100. Train data accuracy is 93.7%. Test data accuracy is 85.34% with precision 92.84% and recall 62.22%, kappa = 0.5853
+rf_model3 = randomForest(income~., data = income_train, ntree = 100, mtry = 3)
+print(rf_model3)
+train_pred_model3 = predict(rf_model3, income_train)
+cm3 = confusionMatrix(train_pred_model3, income_train$income)
+print(cm3)
+test_pred_model3 = predict(rf_model3, income_test)
+cm3_test = confusionMatrix(test_pred_model3, income_test$income)
+print(cm3_test)
+#This graph measures how pure the leaf nodes are without each variable. From the below graph, it can be derived that the varibales Relationship and Capital Gain are the most important while Race and Sex are the least important to classify a profile on income. 
+varImpPlot(random_forest, sort = TRUE, main = "Importance of Variables in RF Model 1")
+
+#No. of nodes for all the trees vary anywhere between 1300 - 2000. Majority of trees have 1700 nodes
+hist(treesize(random_forest), main = "Histogram of No. of Nodes")
+#Gini index of all the variables used in the model
+importance(random_forest)
+
+#NAIVE BAYES CLASSIFIER
+library(naivebayes)
+library(dplyr)
+library(ggplot2)
+library(psych)
+
+#Prediction accuracy is less in Naive Bayes classifier when compared to Random Forest. Here, the train prediction accuracy is 83.18% and test prediction accuracy is 82.1% with precision 93.13% and recall 47.86%. kappa = 0.4576
+nb_model = naive_bayes(income~., income_train)
+nb_train_pred = predict(nb_model, income_train)
+nb_train_cm = confusionMatrix(nb_train_pred, income_train$income)
+print(nb_train_cm)
+nb_test_pred = predict(nb_model, income_test)
+nb_test_cm = confusionMatrix(nb_test_pred, income_test$income)
+print(nb_test_cm)

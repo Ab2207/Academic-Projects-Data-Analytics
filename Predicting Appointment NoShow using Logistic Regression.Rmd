@@ -1,0 +1,79 @@
+setwd("\\Users\\AB\\OneDrive\\Documents\\Datasets\\Appointment No-Show Data")
+
+library(caTools)
+library(ROCR)
+library(ggplot2)
+library(MASS)
+library(caret)
+library(car)
+
+app = read.csv("No_Show.csv", header = TRUE, na.string=c(""))
+str(app)
+
+#Plot showing the frequency of No show or not 
+ggplot(app, aes(x=No.show, fill=No.show))+geom_bar(stat="count")
+
+#Plot showing no show count by Gender. From the plot it is clear that most number of no shows are by Female than male
+ggplot(app, aes(x=Gender, fill=No.show)) + geom_bar(stat="count") 
+
+#One of the records in Age shows -1. Since age cannot be -1, I will consider it as a typing error and replace it with 1
+data.frame(table(factor(app$Age)))
+app[which(app$Age==-1),"Age"] <- 1
+
+#Plot showing no show count by Age
+ggplot(app, aes(x=Age, fill = No.show)) + geom_bar()
+
+#Converting Gender and No.show variables into 0 and 1. 0 for Female and 1 for Male . Similarly, 0 for No for No.show and 1 for Yes for No.show
+levels(app$No.show) = 0:1
+levels(app$Gender) = 0:1
+
+#Removing columns which are not used for this logistic regression. 
+app2_new = app[,c(3, 6, 8:14)]
+str(app2_new)
+sapply(app2_new, function(a) sum(is.na(a)))
+
+#Splitting the data into Training and Testing datasets
+set.seed(1234)
+split = sample.split(app2_new, SplitRatio=0.8)
+train_data = subset(app2_new, split == "TRUE")
+test_data = subset(app2_new, split == "FALSE")
+
+#AIC 84475 RD - 84475. Variables Handcap and Gender are not significant. 
+m1 = glm(No.show ~., train_data, family="binomial")
+summary(m1)
+
+#AIC 84474 RD-84460 All Independent variables are now significant 
+glm2 = glm(No.show ~. -Gender -Handcap , train_data, family="binomial")
+summary(glm2)
+table(glm2)
+vif(glm2)
+
+#AIC 84738 RD 84724
+m3 = glm(No.show ~Age + Scholarship + Hipertension + Diabetes + Alcoholism + SMS_received, train_data, family="binomial")
+summary(m3)
+
+#AIC 84739 RD 84727.. Diabetes is a significant predictor. Hence it should be in the model
+m4 = glm(No.show ~Age+Scholarship+Hipertension+Diabetes +SMS_received    , train_data, family="binomial")
+summary(m4)
+
+#AIC 84740 RD 84728.. Hipertension should be
+m5 = glm(No.show ~Age+Scholarship+Diabetes+Alcoholism+SMS_received, train_data, family="binomial")
+summary(m5)
+
+m6 = glm(No.show~Age, train_data, family="binomial")
+summary(m6)
+
+#According to the this graph 0.2 res value will reduce False Negative cases
+res2 = predict(glm2, train_data, type = "response")
+ROCRPre= prediction(res2, train_data$No.show)
+ROCRperf = performance(ROCRPre, "tpr", "fpr")
+plot(ROCRperf, colorize = TRUE, print.cutoffs.at=seq(0.1, by=0.1))
+
+#Predicting using TEST DATA. Accuracy is 63.63% with model "glm2".  
+res1 = predict(glm2, test_data, type = "response")
+#tabl1 = table(res1>0.3, test_data$No.show)
+confMat = table(Actualvalue = test_data$No.show, Predictedvalue = res1>0.2)
+sum(diag(confMat))/sum(confMat)
+
+
+

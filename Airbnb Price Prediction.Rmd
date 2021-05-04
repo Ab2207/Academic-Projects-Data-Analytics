@@ -1,0 +1,135 @@
+setwd("\\Users\\AB\\OneDrive\\Documents\\Datasets\\AirBnB NYC")
+
+library(ggthemes)
+library(ggplot2)
+library(car)
+library(stats)
+library(dplyr)
+library(ROCR)
+library(GGally)
+
+bnb = read.csv("AB_NYC_2019.csv", header = TRUE)
+names(bnb)
+
+#Price distribution is postive skewed
+ggplot(bnb, aes(x=bnb$price)) + geom_density()
+
+#Log transformation
+bnb$price = log(bnb$price)
+#Checking for NA, INF values and replacing them with mean
+sapply(bnb, function(x) sum(is.na(x)))
+bnb$reviews_per_month[is.na(bnb$reviews_per_month)] = mean(bnb$reviews_per_month, na.rm= TRUE)
+
+#Checking for INF values and replacing them with the mean
+sapply(bnb, function(x) sum(is.infinite(x)))
+bnb$price[is.infinite(bnb$price)] = 4.72
+summary(bnb$price)
+str(bnb)
+
+#Price distribution after log transformation shows normal distribution 
+ggplot(bnb, aes(x=bnb$price)) + geom_density()
+
+#Scatterplot between Room Type and Price. Plot shows that the highest price for both Entire home/apt and Private room are similar. Shared rooms have the lowest price of all
+ggplot(bnb, aes(x=bnb$room_type, y=bnb$price)) + geom_point(shape=1) +
+        labs(x="Room Type", y="Price_Log")
+        
+#Scatterplot between Neighbourhood_group and Price based on the room type. Plot shows that Manhattan and Brooklyn have more number of AirBnb properties when compared to other groups.Also they have similar price distribution.       
+ggplot(bnb, aes(x=bnb$neighbourhood_group, y=bnb$price, color =bnb$room_type))+
+        geom_point(shape=1)
+  
+#Columns id, name, host_id, host_name, minimum_nights, last_review, availability_365 are not useful to predict the price. Columns last_review is the date when the last review was provided, while availability_365 denotes the number of days the Airbnb property is available in a year
+#Neighbourhood, ltitude, longitude columns are not required as neighbourhood_group column consitutes of the location data 
+model_bnb = bnb[,c(5, 9, 10, 12, 14, 15)]
+
+#checking for structure of columns
+names(model_bnb)
+
+#Correlation for continous variables seems to be fine with no much correlation between the predictors
+ggcorr(model_bnb)
+
+#Splitting the data into train and test
+set.seed(1234)
+split = sample(2, nrow(model_bnb), replace = TRUE, prob = c(0.75, 0.25))
+train_data = model_bnb[split==1, ]
+test_data = model_bnb[split==2, ]
+
+sapply(train_data, function(a) sum(is.na(a)))
+sapply(test_data, function(a) sum(is.infinite(a)))
+
+#test_data$reviews_per_month[is.na(test_data$reviews_per_month)] = mean(test_data$reviews_per_month, na.rm= TRUE)
+#train_data$reviews_per_month[is.na(train_data$reviews_per_month)] = mean(train_data$reviews_per_month, na.rm= TRUE)
+
+#Model1 has an R2 of 0.4521. . 
+model1 = lm(price~., train_data)
+summary(model1)
+par(mfrow=c(2,2))
+plot(model1)
+res1 = residuals(model1)
+hist(res1)
+
+#Model2 has an R2 of 0.4514 with all the variables significant with 3 stars
+model2 = lm(price~neighbourhood_group+room_type+number_of_reviews+reviews_per_month, train_data)
+summary(model2)
+
+#Model3. R2 - .4514
+m3 = lm(price~number_of_reviews + room_type + neighbourhood_group + reviews_per_month,  data = train_data)
+summary(m3)
+
+#model5. R2 - .4514
+m5 = lm(price ~ number_of_reviews + room_type + neighbourhood_group + reviews_per_month, train_data)
+summary(m5)
+
+#model6. R2 - .4514
+m6 = lm(price ~ number_of_reviews + room_type + neighbourhood_group + reviews_per_month, train_data)
+summary(m6)
+par(mfrow=c(2,2))
+plot(m6)
+#Residuals is not following normal distribution. Slight skewness
+res2 = residuals(m6)
+hist(res2)
+
+#model7. R2 = .453
+m7 = lm(price ~ sqrt(number_of_reviews) + room_type + neighbourhood_group + reviews_per_month, train_data)
+summary(m7)
+par(mfrow=c(2,2))
+plot(m7)
+#Residuals is not following normal distribution. Slight skewness
+res3 = residuals(m7)
+hist(res3)
+
+#model8. R2 - 0.4596
+m8 = lm(price ~ sqrt(number_of_reviews) + room_type + neighbourhood_group + reviews_per_month +I(reviews_per_month^2), train_data)
+summary(m8)
+par(mfrow=c(2,2))
+plot(m8)
+#Residuals is not following normal distribution. Slight skewness
+res4 = residuals(m8)
+hist(res4)
+
+#model9. R2 - .4577. Residuals are good however few predictions are in negative
+m9 = lm(price ~ number_of_reviews + room_type + neighbourhood_group + reviews_per_month +I(reviews_per_month^2), train_data)
+summary(m9)
+res5 = residuals(m9)
+hist(res5)
+#Scatter plot shows residuals are randomly distributed 
+plot(res5, ylab="Residuals", xlab="Number of Reviews", main="Residuals Model 6")
+
+pre1 = predict(m9, test_data)
+summary(pre1)
+
+#model10. R2 - .4516.. Residuals are good and prediction is in positive numbers
+m10 = lm( price ~ neighbourhood_group + number_of_reviews + room_type + reviews_per_month + reviews_per_month:number_of_reviews , train_data)
+summary(m10)
+par(mfrow=c(2,2))
+plot(m10)
+res6 = residuals(m10)
+plot(res6, ylab="Residuals", xlab="Number of Reviews", main="Residuals of Model10")
+
+#Appying the same model on test data gives an R2 value of .4669
+m10_test = lm( price ~ neighbourhood_group + number_of_reviews + room_type + reviews_per_month + reviews_per_month:number_of_reviews , test_data)
+summary(m10_test)
+
+#Predicting using the model "m10" which thus far had the best results
+pre2 = predict(m10, test_data)
+summary(pre2)
+

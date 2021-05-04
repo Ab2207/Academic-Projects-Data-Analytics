@@ -1,0 +1,21 @@
+#na.string = c("") replaces all the missing values with NA
+
+setwd("\\Users\\AB\\Downloads")
+titanicData = read.csv("titanic.csv", header = TRUE, na.string=c(""))
+titanicData$Survived = as.factor(titanicData$Survived)
+titanicData$Pclass = as.factor(titanicData$Pclass)
+head(titanicData)
+
+#sapply takes input in the form of vector, dataframe or list and gives an output in the same format
+#same is the case with tapply 
+sapply(titanicData, function(a) sum(is.na(a)))
+
+missingval = titanicData[is.na(titanicData$Embarked), ]
+
+paste("PassengerId: ", titanicData[is.na(titanicData$Embarked), 1], "needs to be updated")
+
+embarked = titanicData %>% filter(PassengerId != 62 & PassengerId != 830)
+
+library(ggplot2)
+library(ggthemes)
+library(scales)
